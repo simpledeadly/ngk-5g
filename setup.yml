@@ -1,0 +1,162 @@
+---
+- name: Deploy 5G Infrastructure (Open5GS, OAI, USRP B200)
+  hosts: localhost
+  connection: local
+  become: yes
+
+  vars:
+    oai_dir: /opt/openairinterface5g
+
+  tasks:
+    - name: Update apt cache and upgrade packages
+      apt:
+        update_cache: yes
+        upgrade: dist
+
+    - name: Install specific linux firmware packages
+      apt:
+        name: 
+          - linux-firmware
+        state: present
+      ignore_errors: true
+
+    # ==========================================
+    # MongoDB Install (Dependency for Open5GS)
+    # ==========================================
+    - name: Install software-properties-common, gnupg and curl
+      apt:
+        name:
+          - software-properties-common
+          - gnupg
+          - curl
+        state: present
+
+    - name: Add MongoDB GPG key
+      ansible.builtin.shell: |
+        curl -fsSL https://pgp.mongodb.com/server-7.0.asc | gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
+      args:
+        creates: /usr/share/keyrings/mongodb-server-7.0.gpg
+
+    - name: Add MongoDB repository
+      ansible.builtin.apt_repository:
+        repo: "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse"
+        state: present
+        filename: mongodb-org-7.0
+
+    - name: Install MongoDB
+      apt:
+        name: mongodb-org
+        state: present
+        update_cache: yes
+
+    - name: Start and enable MongoDB service
+      systemd:
+        name: mongod
+        state: started
+        enabled: yes
+
+    # ==========================================
+    # Open5GS Install
+    # ==========================================
+
+    - name: Add Open5GS PPA repository
+      apt_repository:
+        repo: ppa:open5gs/latest
+        state: present
+
+    - name: Install Open5GS
+      apt:
+        name: open5gs
+        state: present
+        update_cache: yes
+
+    # ==========================================
+    # NodeJS and Open5GS WebUI Install
+    # ==========================================
+    - name: Install ca-certificates
+      apt:
+        name: ca-certificates
+        state: present
+
+    - name: Add NodeSource GPG key
+      ansible.builtin.shell: |
+        mkdir -p /etc/apt/keyrings
+        curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
+      args:
+        creates: /etc/apt/keyrings/nodesource.gpg
+
+    - name: Add NodeSource repository
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main"
+        state: present
+        filename: nodesource
+
+    - name: Install NodeJS
+      apt:
+        name: nodejs
+        state: present
+        update_cache: yes
+
+    - name: Install Open5GS WebUI
+      ansible.builtin.shell: |
+        curl -fsSL https://open5gs.org/open5gs/assets/webui/install | sudo -E bash -
+      args:
+        creates: /lib/systemd/system/open5gs-webui.service
+
+    - name: Restart Open5GS Daemons
+      systemd:
+        name: "{{ item }}"
+        state: restarted
+      with_items:
+        - open5gs-mmed
+        - open5gs-sgwud
+        - open5gs-nrfd
+        - open5gs-amfd
+        - open5gs-upfd
+
+    # ==========================================
+    # USRP B200 & UHD Drivers
+    # ==========================================
+    - name: Install UHD drivers and libraries
+      apt:
+        name: 
+          - uhd-host
+          - uhd-images
+          - libuhd-dev
+        state: present
+
+    - name: Download UHD images (firmware for USRP B200)
+      command: uhd_images_downloader
+      register: uhd_download
+      changed_when: "'Images are up to date' not in uhd_download.stdout"
+
+    # ==========================================
+    # OpenAirInterface (OAI)
+    # ==========================================
+    - name: Install git
+      apt:
+        name: git
+        state: present
+
+    - name: Clone OpenAirInterface5G repository
+      git:
+        repo: https://gitlab.eurecom.fr/oai/openairinterface5g.git
+        dest: "{{ oai_dir }}"
+        version: develop
+
+    - name: Install OAI dependencies (build_oai -I)
+      command: ./build_oai -I
+      args:
+        chdir: "{{ oai_dir }}/cmake_targets"
+      environment:
+        DEBIAN_FRONTEND: noninteractive
+      register: oai_deps
+      changed_when: false # usually idempotent, but generates a lot of output
+
+    - name: Build OAI (gNB and nrUE) with USRP support
+      # Warning: This compilation takes a long time.
+      command: ./build_oai -w USRP --gNB --nrUE
+      args:
+        chdir: "{{ oai_dir }}/cmake_targets"
+      register: oai_build
+      changed_when: false # compile logs take time, but execution is the goal
