@@ -1,5 +1,5 @@
 mongodb (https://open5gs.org/open5gs/docs/guide/01-quickstart/)
----
+———————————————————————————————————————————————————————————————
 sudo apt update
 sudo apt install gnupg
 curl -fsSL https://pgp.mongodb.com/server-8.0.asc | sudo gpg -o /usr/share/keyrings/mongodb-server-8.0.gpg --dearmor
@@ -30,13 +30,13 @@ sudo systemctl restart open5gs-sgwud
 sudo systemctl restart open5gs-nrfd
 sudo systemctl restart open5gs-amfd
 sudo systemctl restart open5gs-upfd
----
-sudo nano /etc/open5gs/amf.yaml:
-  change plmn_id:
-    mcc 250
-    mnc 54
-    для amf 127.0.0.5
-    для бс 127.0.0.1
+———————
+sudo nano /etc/open5gs/amf.yaml
+change plmn_id:
+	mcc 250
+	mnc 54
+	для amf 127.0.0.5
+	для бс 127.0.0.1
 
 то же самое для nrf.yaml
 то же самое ? для upf.yaml
@@ -45,7 +45,7 @@ sudo systemctl restart open5gs-nrfd
 sudo systemctl restart open5gs-amfd
 sudo systemctl restart open5gs-upfd
 TODO: попросить конфиги
----
+———————
 тоже как-то обновить mme.yaml
 теперь залезаем в веб-морду и:
 пишем IMSI: 250540000121191, по скрину в чате меняем opc, k, amf
@@ -60,8 +60,8 @@ cmake .. -GNinja
 *здесь возникла проблема со сборкой*
 _сделали кору, осталось сделать бс_
 sudo sysctl -w net.ipv4.ip_forward=1
----
-——————— пробуем клонирование с гитхаба
+----------
+---------- пробуем клонирование с гитхаба
 git clone https://github.com/duranta-project/openairinterface5g.git
 cd openairinterface5g
 cd
@@ -91,7 +91,7 @@ cd cmake_targets/ran_build/build
 ninja)
 cd openairinterface5g/cmake_targets/
 ./build_oai -I --install-optional-packages -w USRP
----
+——————
 export BUILD_UHD_FROM_SOURCE=True
 export UHD_VERSION=4.2.0.1 (в доке написано 4.10.0.0, но надо ставить 4.2.0.1 по ссылке: https://github.com/EttusResearch/uhd/releases/tag/v4.2.0.1)
 ./build_oai -I -w USRP
@@ -102,7 +102,7 @@ cd openairinterface5g/cmake_targets/
 ./build_oai --build-lib all # build all
 ./build_oai --build-lib telnetsrv  # build only telnetsrv
 ./build_oai --build-lib "telnetsrv enbscope uescope nrscope", всё это в скобках свят не ставил)
----
+——————
 cd /usr/local/share/uhd
 mkdir -p images
 sudo unzip -o /home/backlly/Загрузки/uhd-images_4.2.0.1.zip -d /usr/local/share/uhd/images/
