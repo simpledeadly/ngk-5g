@@ -56,7 +56,9 @@
       loop:
         - /etc/apt/sources.list.d/mongodb-org-8.0.list
         - /etc/apt/sources.list.d/open5gs-ubuntu-latest-jammy.list
+        - /etc/apt/sources.list.d/nodesource.list
         - /usr/share/keyrings/mongodb-server-8.0.gpg
+        - /etc/apt/keyrings/nodesource.gpg
 
     - name: 4. Remove directories (Configs, DBs, OAI code)
       file:
