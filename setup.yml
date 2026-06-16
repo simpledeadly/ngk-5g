@@ -19,7 +19,7 @@
         state: present
         reload: yes
 
-    - name: 2. Install prerequisites (gnupg, curl, wget, ca-certificates, git)
+    - name: 2. Install apt prerequisites
       apt:
         name:
           - gnupg
@@ -30,24 +30,24 @@
         state: present
         update_cache: yes
 
-    - name: 3. Add MongoDB 7.0 GPG key
+    - name: 3. Add MongoDB GPG key
       shell: curl -fsSL https://pgp.mongodb.com/server-7.0.asc | gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
       args:
         creates: /usr/share/keyrings/mongodb-server-7.0.gpg
 
-    - name: 4. Add MongoDB 7.0 repository
+    - name: 4. Add MongoDB apt repo
       apt_repository:
         repo: "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse"
         state: present
         filename: mongodb-org-7.0
 
-    - name: 5. Install MongoDB-org
+    - name: 5. Install MongoDB
       apt:
         name: mongodb-org
         state: present
         update_cache: yes
 
-    - name: 6. Start and enable MongoDB service
+    - name: 6. Start MongoDB
       systemd:
         name: mongod
         state: started
@@ -64,12 +64,14 @@
         state: present
         update_cache: yes
 
-    - name: 9. Add NodeSource GPG key (Node 20)
-      shell: curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
+    - name: 9. Add NodeSource GPG key
+      shell: |
+        mkdir -p /etc/apt/keyrings
+        curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
       args:
         creates: /etc/apt/keyrings/nodesource.gpg
 
-    - name: 10. Add NodeSource repository
+    - name: 10. Add NodeSource repo
       apt_repository:
         repo: "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main"
         state: present
@@ -81,36 +83,12 @@
         state: present
         update_cache: yes
 
-    - name: 12. Download and run Open5GS WebUI install script
+    - name: 12. Install Open5GS WebUI
       shell: curl -fsSL https://open5gs.org/open5gs/assets/webui/install | bash -
       args:
         creates: /usr/lib/node_modules/open5gs/package.json
 
-    - name: 13. Update Open5GS Configs (mcc)
-      replace:
-        path: "/etc/open5gs/{{ item }}"
-        regexp: 'mcc: \d+'
-        replace: "mcc: {{ mcc }}"
-      loop:
-        - amf.yaml
-        - nrf.yaml
-        - upf.yaml
-        - mme.yaml
-      ignore_errors: yes
-
-    - name: 14. Update Open5GS Configs (mnc)
-      replace:
-        path: "/etc/open5gs/{{ item }}"
-        regexp: 'mnc: \d+'
-        replace: "mnc: {{ mnc }}"
-      loop:
-        - amf.yaml
-        - nrf.yaml
-        - upf.yaml
-        - mme.yaml
-      ignore_errors: yes
-
-    - name: 15. Restart Open5GS services
+    - name: 13. Restart Open5GS
       systemd:
         name: "{{ item }}"
         state: restarted
@@ -121,7 +99,7 @@
         - open5gs-amfd
         - open5gs-upfd
 
-    - name: 16. Install OAI dependencies (libforms, cmake, etc.)
+    - name: 14. Install OAI deps
       apt:
         name:
           - libforms-dev
@@ -131,19 +109,19 @@
           - unzip
         state: present
 
-    - name: 17. Clone OpenAirInterface5G
+    - name: 15. Clone OAI repo
       git:
         repo: "{{ oai_repo_url }}"
         dest: "/opt/openairinterface5g"
         depth: 1
         force: yes
 
-    - name: 18. Add Ettus Research UHD PPA
+    - name: 16. Add Ettus UHD PPA
       apt_repository:
         repo: ppa:ettusresearch/uhd
         state: present
 
-    - name: 19. Install UHD host and libuhd-dev
+    - name: 17. Install UHD host
       apt:
         name:
           - uhd-host
@@ -151,51 +129,27 @@
         state: present
         update_cache: yes
 
-    - name: 20. Build OAI Dependencies
+    - name: 18. Build OAI deps
       shell: ./build_oai -I --install-optional-packages
       args:
         chdir: "/opt/openairinterface5g/cmake_targets"
       environment:
         DEBIAN_FRONTEND: noninteractive
 
-    - name: 20.5. Compile OAI gNB and UE
+    - name: 19. Compile OAI
       shell: ./build_oai -w USRP --eNB --UE --nrUE --gNB
       args:
         chdir: "/opt/openairinterface5g/cmake_targets"
         creates: "/opt/openairinterface5g/cmake_targets/ran_build/build/nr-softmodem"
 
-    - name: 20.6. Create UHD images directory
+    - name: 20. Create UHD dir
       file:
         path: /usr/share/uhd/images
         state: directory
         mode: "0755"
 
-    - name: 21. Download and Extract Official Ettus UHD Images via wget
+    - name: 21. Download UHD images
       shell: |
         wget -qO /tmp/uhd-images.tar.xz "{{ uhd_images_url }}"
         tar -xf /tmp/uhd-images.tar.xz -C /usr/share/uhd/images --strip-components=1
         rm /tmp/uhd-images.tar.xz
-
-    - name: 22. Configure gNB (mcc, mnc, IPs)
-      shell: |
-        CONF_FILE="/opt/openairinterface5g/targets/PROJECTS/GENERIC-NR-5GC/CONF/gnb.sa.band78.fr1.106PRB.usrpb210.conf"
-        sed -i 's/mcc = [0-9]*/mcc = {{ mcc }}/g' $CONF_FILE
-        sed -i 's/mnc = [0-9]*/mnc = {{ mnc }}/g' $CONF_FILE
-        # Update AMF IP
-        sed -i 's|ipv4 = "[^"]*"|ipv4 = "{{ amf_ip }}"|g' $CONF_FILE
-        # Update GNB IPs
-        sed -i 's|GNB_IPV4_ADDRESS_FOR_NG_AMF = "[^"]*"|GNB_IPV4_ADDRESS_FOR_NG_AMF = "{{ gnb_ip_cidr }}"|g' $CONF_FILE
-        sed -i 's|GNB_IPV4_ADDRESS_FOR_NGU = "[^"]*"|GNB_IPV4_ADDRESS_FOR_NGU = "{{ gnb_ip_cidr }}"|g' $CONF_FILE
-      args:
-        executable: /bin/bash
-
-    - name: 23. Install Realtime Kernel
-      apt:
-        name:
-          - linux-image-5.15.0-1032-realtime
-          - linux-modules-5.15.0-1032-realtime
-          - linux-headers-5.15.0-1032-realtime
-        state: present
-
-    - name: 24. Update GRUB
-      command: update-grub
