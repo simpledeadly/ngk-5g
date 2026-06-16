@@ -1,0 +1,1 @@
+# Ansible Playboor for setup 5G core
