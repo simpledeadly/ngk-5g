@@ -19,11 +19,12 @@
         state: present
         reload: yes
 
-    - name: 2. Install prerequisites (gnupg, curl, ca-certificates, git)
+    - name: 2. Install prerequisites (gnupg, curl, wget, ca-certificates, git)
       apt:
         name:
           - gnupg
           - curl
+          - wget
           - ca-certificates
           - git
         state: present
