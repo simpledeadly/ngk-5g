@@ -13,5 +13,5 @@ ansible all -i hosts.ini -m ping
 ### lfg!
 
 ```bash
-ansible-playbook -i hosts.ini setup.yml
+ansible-playbook -i hosts.ini setup.yaml -k
 ```
