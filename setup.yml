@@ -1,7 +1,7 @@
 ---
 - name: Deploy Open5GS Core and OAI gNB
-  hosts: localhost
-  connection: local
+  hosts: 5g_servers
+  # connection: local
   become: yes # it's like sudo
   vars:
     mcc: "250"
